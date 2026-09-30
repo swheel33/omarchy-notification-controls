@@ -3,8 +3,9 @@
   "id": "hotwheels.notification-controls",
   "name": "Notification Controls",
   "version": "1.4.0",
-  "author": "Omarchy",
-  "description": "Notification daemon with per-source delivery controls",
+  "author": "swheel33",
+  "license": "MIT",
+  "description": "Per-application notification settings for Omarchy",
   "kinds": [
     "service",
     "panel",

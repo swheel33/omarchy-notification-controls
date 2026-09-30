@@ -10,6 +10,22 @@ Notification Controls puts the apps from your application launcher in one search
 
 Installed web apps have their own controls. Related background helpers follow their app's setting without cluttering the list.
 
+![Notification Controls showing application notification settings](preview.png)
+
+## Install
+
+Requires Omarchy's Quickshell desktop and Python 3.
+
+```bash
+omarchy plugin add https://github.com/swheel33/omarchy-notification-controls --enable
+```
+
+This replaces Omarchy's built-in notification service. To position the bell before the system tray:
+
+```bash
+omarchy bar move hotwheels.notification-controls --before omarchy.tray
+```
+
 ## Open notification settings
 
 **Left-click the bell** in the top bar to open settings. **Right-click the bell** to toggle Do Not Disturb. The bell changes to a muted icon when DND is on.
@@ -21,3 +37,15 @@ You can also open settings with:
 ```bash
 omarchy shell shell summon hotwheels.notification-controls
 ```
+
+## Remove
+
+```bash
+omarchy plugin remove hotwheels.notification-controls
+```
+
+Removing the plugin restores Omarchy's built-in notification service. Saved notification preferences remain on disk.
+
+## License
+
+[MIT](LICENSE), including the original Omarchy copyright notice.
