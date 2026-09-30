@@ -58,7 +58,6 @@ Item {
   // map only holds a wrapper, which degrades to a catchable error instead.
   property var liveRefs: ({})
   property var applicationModes: ({})
-  property var observedSources: ({})
   property var applicationCatalog: []
   property var applicationKeys: ({})
   property var pendingNotifications: []
@@ -94,7 +93,8 @@ Item {
 
   function applicationsList() {
     var sources = []
-    var catalog = NotificationLogic.sourceList(applicationCatalog, observedSources, applicationModes)
+    var catalog = applicationCatalog.filter(function(app) { return app.visible === true })
+      .sort(function(a, b) { return a.label.toLowerCase().localeCompare(b.label.toLowerCase()) })
     for (var i = 0; i < catalog.length; i++) {
       var application = catalog[i]
       sources.push({
@@ -105,7 +105,6 @@ Item {
         desktopEntry: application.desktopEntry,
         source: application.source,
         searchText: application.searchText,
-        memberCount: application.memberCount,
         mode: NotificationLogic.applicationDisplayMode(applicationModes, applicationKeys, application)
       })
     }
@@ -119,6 +118,10 @@ Item {
   function loadApplicationCatalog(raw) {
     var entries
     try { entries = JSON.parse(raw) } catch (e) { return }
+    var launcherIds = {}
+    var launchers = DesktopEntries.applications.values || []
+    for (var i = 0; i < launchers.length; i++) launcherIds[launchers[i].id] = true
+    for (var i = 0; i < entries.length; i++) entries[i].visible = entries[i].visible && launcherIds[entries[i].id] === true
     var catalog = NotificationLogic.buildApplicationCatalog(entries)
     applicationCatalog = NotificationLogic.mergeApplicationCatalog(catalog.applications, applicationCatalog, catalog.aliases)
     applicationKeys = NotificationLogic.applicationIndex(applicationCatalog)
@@ -128,28 +131,21 @@ Item {
 
   function applicationMode(key) {
     var id = String(key || "")
-    var source = observedSources[id]
-    return NotificationLogic.groupedMode(applicationModes, applicationKeys, id, source ? source.fallbackKey : "")
+    return NotificationLogic.groupedMode(applicationModes, applicationKeys, id)
   }
 
   function applicationForKey(key) {
     var id = String(key || "")
-    return applicationKeys[id] || observedSources[id] ||
+    return applicationKeys[id] ||
       (Object.prototype.hasOwnProperty.call(applicationModes, id) ? { key: id } : null)
   }
 
   function applicationKeyFor(snapshot) {
-    return NotificationLogic.sourceKeyFor(snapshot)
-  }
-
-  function rememberSource(snapshot) {
-    var source = NotificationLogic.observedSource(snapshot)
-    if (!source.key) return
-    if (JSON.stringify(observedSources[source.key]) === JSON.stringify(source)) return
-    var next = Object.assign({}, observedSources)
-    next[source.key] = source
-    observedSources = next
-    scheduleSettingsSave()
+    var key = NotificationLogic.sourceKeyFor(snapshot)
+    // Installed web apps have their own setting; ordinary sites belong to the browser.
+    if (snapshot.source && !applicationKeys[key] && applicationModes[key] === undefined)
+      return NotificationLogic.applicationKey(snapshot.desktopEntry) || NotificationLogic.identityKey("name", snapshot.app)
+    return key
   }
 
   Connections {
@@ -289,7 +285,6 @@ Item {
   function processNotification(notification) {
     var snapshot = snapshotOf(notification)
     snapshot.sourceKey = applicationKeyFor(snapshot)
-    rememberSource(snapshot)
     liveRefs[snapshot.originalId] = notification
     // Guard the delete: a newer notification may have reused this originalId
     // (freedesktop replaces_id) and taken over the map slot.
@@ -1011,7 +1006,6 @@ Item {
     }
 
     service.applicationModes = parsed.modes || {}
-    service.observedSources = parsed.sources || {}
     service.applicationCatalog = NotificationLogic.mergeApplicationCatalog(service.applicationCatalog, parsed.catalog || [])
     service.applicationKeys = NotificationLogic.applicationIndex(service.applicationCatalog)
 
@@ -1030,7 +1024,6 @@ Item {
       version: 4,
       dnd: persisted.doNotDisturb,
       modes: service.applicationModes,
-      sources: service.observedSources,
       catalog: service.applicationCatalog
     }, null, 2) + "\n")
   }

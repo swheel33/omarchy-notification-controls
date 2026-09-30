@@ -18,18 +18,17 @@ On this machine, **Setup → Notifications** opens the panel through the user me
 
 The bell before the system tray opens settings on left-click and toggles Do Not Disturb on right-click. It changes to a muted bell while DND is on. Omarchy appends new user menu entries after built-in entries; its menu extension format currently has no placement field.
 
-## Source identity
+## Application list
 
 - Related native launchers and helpers share one application row and delivery setting. The catalog uses executable ownership, shared application names, and companion-package metadata; unrelated applications bundled in one package stay separate when their names differ.
-- Native notifications resolve through their desktop ID. Senders without a desktop entry join an application only when their name uniquely matches its metadata. Other senders appear under their application name, with no internal identity labels in the UI.
-- Browser website notifications use their origin. Newly observed origins inherit the sending browser's policy until explicitly configured; choosing Normal explicitly overrides a blocked browser.
-- Installed web apps are discovered from desktop files. Standard Omarchy launchers, stock HEY and Zoom handlers, Chromium `--app` launchers, and explicit `OMARCHY_WEBAPP_ORIGIN` metadata are supported. No webapp installer changes are needed. Other custom handlers are still configurable when their website first sends a notification.
-- Source names and policies remain available after hiding or removing a launcher. The catalog enriches the settings UI; delivery never waits for it.
-- Hidden helper launchers contribute identities to their application without adding separate initial rows. Hidden-only sources appear when observed or configured. Entries marked `Hidden=true` mask installed launchers.
+- Only applications visible in Omarchy's launcher appear in settings, using a visible launcher's name and icon. The list uses Quickshell's application entries and Omarchy's own launcher exclusion rules. Incoming notifications never create rows.
+- Native notifications resolve through their desktop ID. Senders without a desktop entry join an application only when their name uniquely matches its metadata. Unmatched senders follow normal notification behavior and DND.
+- Installed web apps have their own settings, matched by website origin. Ordinary website notifications use their browser's setting. Standard Omarchy launchers, stock HEY and Zoom handlers, Chromium `--app` launchers, and explicit `OMARCHY_WEBAPP_ORIGIN` metadata are supported.
+- Hidden helpers contribute identities to their parent app, without separate rows or helper descriptions. Hiding or removing an app removes it from the list; existing saved rules remain effective internally.
 - Existing conflicting delivery preferences remain effective and show as different saved settings. Choosing a delivery mode replaces those preferences with one application-wide setting.
 - History-only delivery follows Omarchy's existing transient-notification behavior: ephemeral notifications are discarded rather than archived.
 
-The plugin stores DND, modes, observed source identities, and application grouping metadata in `~/.local/state/omarchy/notification-controls.json`. Saved identities load before routing starts, so policies also cover helpers before the desktop scan completes and after launcher removal. It imports existing `notifications.json` preferences on first use. Notification bodies are not stored in this settings file; popup/history storage uses Omarchy's existing directories.
+The plugin stores DND, modes, and application grouping metadata in `~/.local/state/omarchy/notification-controls.json`. Saved identities load before routing starts, so policies also cover helpers before the desktop scan completes and after launcher removal. It imports existing `notifications.json` preferences on first use. Notification bodies are not stored in this settings file; popup/history storage uses Omarchy's existing directories.
 
 ## Development and installation
 

@@ -52,6 +52,7 @@ Item {
     if (root.shell && typeof root.shell.serviceFor === "function")
       root.service = root.shell.serviceFor((root.manifest && root.manifest.id) || "omarchy.notifications")
     root.opened = true
+    if (root.service) root.service.rebuildApplicationCatalog()
     root.searchText = ""
     root.selectedKey = root.applications.length > 0 ? String(root.applications[0].key) : ""
     Qt.callLater(function() {
@@ -100,9 +101,7 @@ Item {
   function applicationSubtitle(application) {
     if (!application) return ""
     if (application.mode === "mixed") return "Different saved settings — choose one for this app"
-    if (!application.source) return Number(application.memberCount || 0) > 1 ? "Includes related services and helpers" : ""
-    var shared = Number(application.memberCount || 0) > 1 ? " (shared origin)" : ""
-    return String(application.source) + shared
+    return ""
   }
 
   onApplicationsChanged: ensureSelection()

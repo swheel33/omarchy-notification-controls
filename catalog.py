@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import shlex
 import shutil
+import subprocess
 from urllib.parse import urlsplit
 
 
@@ -93,12 +94,17 @@ def package_owners(paths, database=Path("/var/lib/pacman/local")):
 
 def applications():
   home = Path.home()
+  omarchy = Path(os.environ["OMARCHY_PATH"])
+  desktops = ":".join(os.environ.get(key, "") for key in ("XDG_CURRENT_DESKTOP", "XDG_SESSION_DESKTOP", "DESKTOP_SESSION"))
+  # The stock scanner can exit 1 when its final optional Nix directory is absent.
+  hidden = set(subprocess.run([str(omarchy / "shell/services/hidden-entries.sh"), desktops], text=True, stdout=subprocess.PIPE).stdout.splitlines())
+  hidden.update(line.strip().removesuffix(".desktop") for line in (omarchy / "default/omarchy/launcher.hides").read_text().splitlines())
   data_home = Path(os.environ.get("XDG_DATA_HOME", home / ".local/share"))
   data_dirs = os.environ.get("XDG_DATA_DIRS", "/usr/local/share:/usr/share").split(":")
   language = (locale.getlocale()[0] or "").split(".")[0]
   seen = set()
   entries = []
-  for base in [data_home] + [Path(d) for d in data_dirs if d]:
+  for base in [data_home] + [Path(d) for d in data_dirs if d] + [home / ".nix-profile/share"]:
     directory = base / "applications"
     for path in sorted(directory.rglob("*.desktop")):
       desktop_id = str(path.relative_to(directory)).replace("/", "-")[:-8]
@@ -122,7 +128,7 @@ def applications():
         entries.append({"id": desktop_id, "label": label,
           "appIcon": entry.get("Icon", ""), "startupClass": entry.get("StartupWMClass", ""),
           "command": command, "name": entry.get("Name", label),
-          "visible": entry.get("NoDisplay", "").lower() != "true"})
+          "visible": desktop_id not in hidden and entry.get("NoDisplay", "").lower() != "true"})
       except (OSError, UnicodeError, configparser.Error, KeyError, ValueError):
         continue
   commands = {entry["id"]: executable(entry["command"]) for entry in entries if not command_origin(entry["command"])}

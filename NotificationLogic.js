@@ -27,72 +27,6 @@ function sourceKeyFor(snapshot) {
   return originKey(s.source) || applicationKey(s.desktopEntry) || identityKey("name", s.app)
 }
 
-function observedSource(snapshot) {
-  var s = snapshot || {}
-  var origin = normalizedOrigin(s.source)
-  var browserKey = applicationKey(s.desktopEntry) || identityKey("name", s.app)
-  var label = origin || String(s.app || s.desktopEntry || "Unknown application")
-  if (!origin) {
-    if (normalizedIdentity(label) === "omarchy-action") label = "Omarchy"
-    else if (normalizedIdentity(label) === "omasnap") label = "Omasnap"
-  }
-  return {
-    key: sourceKeyFor(s), label: label, app: String(s.app || ""),
-    appIcon: String(s.appIcon || "").charAt(0) === "/" ? "" : String(s.appIcon || ""),
-    desktopEntry: String(s.desktopEntry || ""), source: origin,
-    fallbackKey: origin ? browserKey : "", memberCount: 1,
-    searchText: [label, s.app, s.desktopEntry, origin].join(" ")
-  }
-}
-
-function sourceMode(modes, key, fallbackKey) {
-  if (Object.prototype.hasOwnProperty.call(modes, key)) return validApplicationMode(modes[key])
-  return validApplicationMode(fallbackKey ? modes[fallbackKey] : "normal")
-}
-
-function sourceList(catalog, observed, modes) {
-  var sources = {}
-  var covered = {}
-  for (var i = 0; i < catalog.length; i++) {
-    var members = catalog[i].memberKeys || [catalog[i].key]
-    for (var j = 0; j < members.length; j++) covered[members[j]] = catalog[i].key
-  }
-  for (var key in observed) sources[key] = observed[key]
-  for (var i = 0; i < catalog.length; i++) {
-    var app = catalog[i]
-    var relevant = app.visible !== false || modes[app.key] !== undefined || observed[app.key]
-    for (var j = 0; j < app.memberKeys.length; j++) {
-      var member = app.memberKeys[j]
-      if (modes[member] !== undefined || observed[member]) relevant = true
-    }
-    if (relevant) sources[app.key] = Object.assign({}, observed[app.key] || {}, app)
-  }
-  for (var key in modes) {
-    if (sources[key]) continue
-    var label = key.slice(key.indexOf(":") + 1)
-    try { label = decodeURIComponent(label) } catch (e) {}
-    sources[key] = { key: key, label: label, app: label, appIcon: "",
-      desktopEntry: "", source: "", memberCount: 1, searchText: label }
-  }
-  return Object.keys(sources).filter(function(key) {
-    return !covered[key] || covered[key] === key
-  }).map(function(key) { return sources[key] }).sort(function(a, b) {
-    return a.label.toLowerCase().localeCompare(b.label.toLowerCase())
-  })
-}
-
-function normalizedSources(value) {
-  var sources = {}
-  if (!value || typeof value !== "object" || Array.isArray(value)) return sources
-  for (var key in value) {
-    var raw = value[key]
-    if (!raw || typeof raw !== "object") continue
-    var source = observedSource(raw)
-    if (source.key === key) sources[key] = source
-  }
-  return sources
-}
-
 // Saved identities are hydrated with policies before notification routing starts.
 // Keep missing launchers as hidden metadata so removing one cannot lose a rule.
 function mergeApplicationCatalog(current, previous, aliases) {
@@ -138,27 +72,26 @@ function normalizedCatalog(value) {
   })
 }
 
-function groupedMode(modes, keys, key, fallbackKey) {
+function groupedMode(modes, keys, key) {
   var app = keys[key]
   if (app && modes[app.key] !== undefined) return validApplicationMode(modes[app.key])
   if (modes[key] !== undefined) return validApplicationMode(modes[key])
-  if (fallbackKey) return groupedMode(modes, keys, fallbackKey, "")
   return "normal"
 }
 
 function applicationDisplayMode(modes, keys, app) {
   if (modes[app.key] !== undefined) return validApplicationMode(modes[app.key])
-  if (app.source) return groupedMode(modes, keys, app.key, app.fallbackKey)
+  if (app.source) return groupedMode(modes, keys, app.key)
   var members = app.memberKeys || [app.key]
   var selected = null
   for (var i = 0; i < members.length; i++) {
     // Unconfigured sender aliases are not separate legacy preferences.
     if (members[i].indexOf("name:") === 0 && modes[members[i]] === undefined) continue
-    var mode = groupedMode(modes, keys, members[i], app.fallbackKey)
+    var mode = groupedMode(modes, keys, members[i])
     if (selected !== null && selected !== mode) return "mixed"
     selected = mode
   }
-  return selected || groupedMode(modes, keys, app.key, app.fallbackKey)
+  return selected || groupedMode(modes, keys, app.key)
 }
 
 function normalizedOrigin(value) {
@@ -309,11 +242,9 @@ function buildApplicationCatalog(entries) {
       return Number(b.visible !== false) - Number(a.visible !== false) || a.label.length - b.label.length || a.desktopEntry.localeCompare(b.desktopEntry)
     })
     var first = slot.members[0]
-    var labels = []
     var search = [slot.origin]
     for (var m = 0; m < slot.members.length; m++) {
       var member = slot.members[m]
-      labels.push(member.label)
       search.push(member.label, member.desktopEntry, member.startupClass)
       claimAlias(aliases, member.desktopEntry, slot.key)
       claimAlias(aliases, member.label, slot.key)
@@ -325,25 +256,14 @@ function buildApplicationCatalog(entries) {
     }
     var application = {
       key: slot.key,
-      label: slot.origin ? labels.join(" + ") : first.label,
+      label: first.label,
       app: first.label,
       appIcon: first.appIcon,
       desktopEntry: first.desktopEntry,
       source: slot.origin,
       searchText: search.join(" "),
-      memberCount: slot.members.length,
       visible: slot.members.some(function(member) { return member.visible !== false }),
       memberKeys: slot.members.map(function(member) { return applicationKey(member.desktopEntry) })
-    }
-    if (!slot.origin && slot.members.length > 1) {
-      var words = first.label.split(/\s+/)
-      for (var m = 1; m < slot.members.length; m++) {
-        var other = slot.members[m].label.split(/\s+/)
-        var n = 0
-        while (n < words.length && n < other.length && words[n].toLowerCase() === other[n].toLowerCase()) n++
-        words = words.slice(0, n)
-      }
-      if (words.length) application.label = words.join(" ")
     }
     applications.push(application)
     keys[slot.key] = application
@@ -673,7 +593,6 @@ function parseSettings(raw) {
       error: false,
       dnd: parsed && typeof parsed.dnd === "boolean" ? parsed.dnd : null,
       modes: normalizedApplicationModes(parsed && parsed.modes),
-      sources: normalizedSources(parsed && parsed.sources),
       catalog: normalizedCatalog(parsed && parsed.catalog),
       legacy: !!(parsed && !future && (parsed.version !== 4 || parsed.pending || parsed.past || parsed.entries)),
       future: future
@@ -855,58 +774,4 @@ function historyRows(raw, liveRows, normalUrgency, limit) {
   collect(parsePopupFiles(raw, normalUrgency))
   out.sort(function(a, b) { return (b.timestamp || 0) - (a.timestamp || 0) })
   return out.slice(0, max)
-}
-
-if (typeof module !== "undefined") {
-  module.exports = {
-    mergeApplicationCatalog: mergeApplicationCatalog,
-    applicationIndex: applicationIndex,
-    groupedMode: groupedMode,
-    applicationDisplayMode: applicationDisplayMode,
-    isChromiumDerived: isChromiumDerived,
-    normalizedIdentity: normalizedIdentity,
-    applicationKey: applicationKey,
-    sourceKeyFor: sourceKeyFor,
-    observedSource: observedSource,
-    sourceMode: sourceMode,
-    sourceList: sourceList,
-    normalizedSources: normalizedSources,
-    normalizedOrigin: normalizedOrigin,
-    originKey: originKey,
-    webAppOrigin: webAppOrigin,
-    browserOriginFromBody: browserOriginFromBody,
-    notificationSource: notificationSource,
-    applicationAlias: applicationAlias,
-    buildApplicationCatalog: buildApplicationCatalog,
-    validApplicationMode: validApplicationMode,
-    normalizedApplicationModes: normalizedApplicationModes,
-    deliveryTarget: deliveryTarget,
-    sanitizeBody: sanitizeBody,
-    styledBody: styledBody,
-    summaryStartsWithGlyph: summaryStartsWithGlyph,
-    shouldBypassDnd: shouldBypassDnd,
-    isEphemeralApp: isEphemeralApp,
-    stringHint: stringHint,
-    glyphFromHints: glyphFromHints,
-    execArgvFromHints: execArgvFromHints,
-    parseExecArgv: parseExecArgv,
-    shouldRenderCompactGlyph: shouldRenderCompactGlyph,
-    snapshotOf: snapshotOf,
-    popupRoles: popupRoles,
-    popupRowChanged: popupRowChanged,
-    isDuplicatePopup: isDuplicatePopup,
-    replacementSnapshot: replacementSnapshot,
-    historyEntry: historyEntry,
-    parseSettings: parseSettings,
-    historyRows: historyRows,
-    popupEntry: popupEntry,
-    popupFileName: popupFileName,
-    imageStem: imageStem,
-    localImageFile: localImageFile,
-    persistablePopup: persistablePopup,
-    serializePopup: serializePopup,
-    parsePopupFiles: parsePopupFiles,
-    popupExpired: popupExpired,
-    popupPlacement: popupPlacement
-  }
 }
