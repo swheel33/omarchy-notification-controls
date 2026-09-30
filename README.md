@@ -21,7 +21,7 @@ The bell before the system tray opens settings on left-click and toggles Do Not 
 ## Source identity
 
 - Related native launchers and helpers share one application row and delivery setting. The catalog uses executable ownership, shared application names, and companion-package metadata; unrelated applications bundled in one package stay separate when their names differ.
-- Native notifications resolve through their desktop ID. Senders without a desktop entry join an application only when their name uniquely matches its metadata. Unrecognized or ambiguous senders remain separate **reported name** sources.
+- Native notifications resolve through their desktop ID. Senders without a desktop entry join an application only when their name uniquely matches its metadata. Other senders appear under their application name, with no internal identity labels in the UI.
 - Browser website notifications use their origin. Newly observed origins inherit the sending browser's policy until explicitly configured; choosing Normal explicitly overrides a blocked browser.
 - Installed web apps are discovered from desktop files. Standard Omarchy launchers, stock HEY and Zoom handlers, Chromium `--app` launchers, and explicit `OMARCHY_WEBAPP_ORIGIN` metadata are supported. No webapp installer changes are needed. Other custom handlers are still configurable when their website first sends a notification.
 - Source names and policies remain available after hiding or removing a launcher. The catalog enriches the settings UI; delivery never waits for it.

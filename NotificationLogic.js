@@ -31,8 +31,11 @@ function observedSource(snapshot) {
   var s = snapshot || {}
   var origin = normalizedOrigin(s.source)
   var browserKey = applicationKey(s.desktopEntry) || identityKey("name", s.app)
-  var label = origin || String(s.app || s.desktopEntry || "Unknown source")
-  if (!origin && !s.desktopEntry) label += " (reported name)"
+  var label = origin || String(s.app || s.desktopEntry || "Unknown application")
+  if (!origin) {
+    if (normalizedIdentity(label) === "omarchy-action") label = "Omarchy"
+    else if (normalizedIdentity(label) === "omasnap") label = "Omasnap"
+  }
   return {
     key: sourceKeyFor(s), label: label, app: String(s.app || ""),
     appIcon: String(s.appIcon || "").charAt(0) === "/" ? "" : String(s.appIcon || ""),
