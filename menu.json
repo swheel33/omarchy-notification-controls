@@ -1,0 +1,7 @@
+{
+  "setup.notifications": {
+    "icon": "󰂚",
+    "label": "Notifications",
+    "action": "omarchy-shell shell summon hotwheels.notification-controls"
+  }
+}

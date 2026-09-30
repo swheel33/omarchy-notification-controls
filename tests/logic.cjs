@@ -51,7 +51,7 @@ assert.equal(logic.deliveryTarget('normal', true, true, true), 'popup')
 
 // Exercise actual service methods under the third-party facade (no appLibrary)
 // before the asynchronous desktop catalog completes.
-const qml = fs.readFileSync(require.resolve('../Service.qml'), 'utf8')
+const qml = fs.readFileSync(require.resolve('../NotificationService.qml'), 'utf8')
 const names = ['applicationMode', 'applicationForKey', 'applicationKeyFor',
   'handleNotification', 'drainPendingNotifications', 'setApplicationMode']
 const functions = names.map(name => {

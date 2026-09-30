@@ -1,4 +1,4 @@
-// Notification service for the omarchy shell.
+// Replacement notification service for the Omarchy shell.
 
 import QtQuick
 import QtQuick.Layouts
@@ -953,6 +953,7 @@ Item {
   FileView {
     id: settingsFile
     path: service.settingsPath
+    preload: true
     watchChanges: false
     atomicWrites: true
     printErrors: false
@@ -964,7 +965,7 @@ Item {
     onLoadFailed: {
       // First enable imports the existing DND preference / PR settings without
       // letting the stock daemon overwrite plugin policies on later removal.
-      legacySettings.reload()
+      service.loadSettings(legacySettings.text())
     }
   }
 
@@ -972,9 +973,8 @@ Item {
     id: legacySettings
     path: service.stateDir + "notifications.json"
     preload: false
+    blockLoading: true
     printErrors: false
-    onLoaded: service.loadSettings(text())
-    onLoadFailed: service.loadSettings("")
   }
 
   Timer {

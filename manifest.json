@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "id": "hotwheels.notifications",
+  "id": "hotwheels.notification-controls",
   "name": "Notification Controls",
   "version": "1.0.0",
   "author": "Omarchy",
@@ -11,7 +11,7 @@
   ],
   "keepLoaded": true,
   "entryPoints": {
-    "service": "Service.qml",
+    "service": "NotificationService.qml",
     "panel": "Panel.qml"
   },
   "omarchy": {
