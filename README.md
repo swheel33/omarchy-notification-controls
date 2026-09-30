@@ -26,7 +26,7 @@ The bell before the system tray opens settings on left-click and toggles Do Not 
 - Installed web apps have their own settings, matched by website origin. Ordinary website notifications use their browser's setting. Standard Omarchy launchers, stock HEY and Zoom handlers, Chromium `--app` launchers, and explicit `OMARCHY_WEBAPP_ORIGIN` metadata are supported.
 - Hidden helpers contribute identities to their parent app, without separate rows or helper descriptions. Hiding or removing an app removes it from the list; existing saved rules remain effective internally.
 - Existing conflicting delivery preferences remain effective and show as different saved settings. Choosing a delivery mode replaces those preferences with one application-wide setting.
-- When upgrading from package-family grouping, a saved family preference is copied to its individual launcher apps unless they already have an explicit setting. Web launchers sharing a website origin still share that site's setting.
+- Web launchers sharing a website origin share that site's setting.
 - History-only delivery follows Omarchy's existing transient-notification behavior: ephemeral notifications are discarded rather than archived.
 
 The plugin stores DND, modes, and application grouping metadata in `~/.local/state/omarchy/notification-controls.json`. Saved identities load before routing starts, so policies also cover helpers before the desktop scan completes and after launcher removal. It imports existing `notifications.json` preferences on first use. Notification bodies are not stored in this settings file; popup/history storage uses Omarchy's existing directories.

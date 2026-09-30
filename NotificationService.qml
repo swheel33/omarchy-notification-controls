@@ -123,15 +123,6 @@ Item {
     for (var i = 0; i < launchers.length; i++) launcherIds[launchers[i].id] = true
     for (var i = 0; i < entries.length; i++) entries[i].visible = entries[i].visible && launcherIds[entries[i].id] === true
     var catalog = NotificationLogic.buildApplicationCatalog(entries)
-    // Split older family-wide preferences across the launchers they covered.
-    var modes = Object.assign({}, applicationModes)
-    for (var i = 0; i < catalog.applications.length; i++) {
-      var app = catalog.applications[i]
-      var previous = applicationKeys[app.key]
-      if (modes[app.key] === undefined && previous && modes[previous.key] !== undefined)
-        modes[app.key] = modes[previous.key]
-    }
-    applicationModes = modes
     applicationCatalog = NotificationLogic.mergeApplicationCatalog(catalog.applications, applicationCatalog, catalog.aliases)
     applicationKeys = NotificationLogic.applicationIndex(applicationCatalog)
     catalogLoaded = true
