@@ -1,64 +1,70 @@
 # Notification Controls
 
-A replacement for Omarchy's built-in notifications plugin, providing Normal, History only, and Off delivery policies plus global Do Not Disturb. Runs inside the existing Omarchy shell; no second notification daemon and no patched Omarchy installation are required.
+Per-application notification settings for Omarchy. Choose an app from your launcher and decide how its notifications reach you.
 
-## Status
+This experimental plugin replaces Omarchy's built-in notification service and runs inside the existing Quickshell desktop.
 
-Working local plugin, enabled on this machine's regular desktop. The grouped application list has been inspected in the running UI on Omarchy 4.0.4-1. The original replacement daemon was also verified against pristine upstream `quattro` at `8b4eae66`.
+## Usage
 
-## Open settings
+Click the bell in the bar to open settings. Right-click it to toggle Do Not Disturb. A muted bell indicates DND is on; hovering shows no tooltip.
+
+Each app has three delivery options:
+
+| Setting | Behavior |
+| --- | --- |
+| Normal | Show popups and retain notification history. |
+| History only | Save notifications without showing popups. |
+| Off | Discard new notifications from the app. |
+
+Global DND silences normal popups while retaining history. Omarchy's existing DND exceptions and transient-notification behavior still apply.
+
+You can also open settings from the terminal:
 
 ```bash
 omarchy shell shell summon hotwheels.notification-controls
 ```
 
-The manifest uses `omarchy.clonedFrom: omarchy.notifications`, so enabling it through Omarchy's plugin manager replaces the built-in service. Existing notification IPC calls and DND controls retain their targets.
+## Which apps appear?
 
-On this machine, **Setup → Notifications** opens the panel through the user menu extension. `menu.json` contains that entry for merging into `~/.config/omarchy/extensions/omarchy-menu.jsonc`; preserve any existing entries when installing elsewhere.
+The application launcher defines the list. Each visible native launcher gets its own name, icon, and setting. Hidden helpers attach to an app only when executable or window-class metadata identifies a clear parent.
 
-The bell before the system tray opens settings on left-click and toggles Do Not Disturb on right-click. It changes to a muted bell while DND is on. Omarchy appends new user menu entries after built-in entries; its menu extension format currently has no placement field.
+Installed web apps have their own settings, matched by website origin. Launchers for the same origin share a setting. Ordinary website notifications use the browser's setting.
 
-## Application list
+Incoming notifications never add rows. Unrecognized senders follow the default notification behavior and DND. Matching depends on the identity supplied by the sending application; an ambiguous sender name is not guessed.
 
-- Each visible native launcher has its own row and delivery setting. A hidden helper joins an app only when its executable or window-class metadata identifies one unambiguous visible parent. Package ownership and name prefixes are not used to group apps.
-- Only applications visible in Omarchy's launcher appear in settings, using a visible launcher's name and icon. The list uses Quickshell's application entries and Omarchy's own launcher exclusion rules. Incoming notifications never create rows.
-- Native notifications resolve through their desktop ID. Senders without a desktop entry join an application only when their name uniquely matches its metadata. Unmatched senders follow normal notification behavior and DND.
-- Installed web apps have their own settings, matched by website origin. Ordinary website notifications use their browser's setting. Standard Omarchy launchers, stock HEY and Zoom handlers, Chromium `--app` launchers, and explicit `OMARCHY_WEBAPP_ORIGIN` metadata are supported.
-- Hidden helpers contribute identities to their parent app, without separate rows or helper descriptions. Hiding or removing an app removes it from the list; existing saved rules remain effective internally.
-- Existing conflicting delivery preferences remain effective and show as different saved settings. Choosing a delivery mode replaces those preferences with one application-wide setting.
-- Web launchers sharing a website origin share that site's setting.
-- History-only delivery follows Omarchy's existing transient-notification behavior: ephemeral notifications are discarded rather than archived.
+## Install from this checkout
 
-The plugin stores DND, modes, and application grouping metadata in `~/.local/state/omarchy/notification-controls.json`. Saved identities load before routing starts, so policies also cover helpers before the desktop scan completes and after launcher removal. It imports existing `notifications.json` preferences on first use. Notification bodies are not stored in this settings file; popup/history storage uses Omarchy's existing directories.
-
-## Development and installation
-
-This checkout's plugin ID is `hotwheels.notification-controls`. It began as a built-in clone and retains the supported `clonedFrom` replacement metadata. Copy the plugin runtime files (`manifest.json`, `NotificationService.qml`, `Panel.qml`, `Bell.qml`, `NotificationLogic.js`, `catalog.py`, and `components/`) into `~/.config/omarchy/plugins/hotwheels.notification-controls/`, then place it on the bar:
+Requires Omarchy with its Quickshell desktop and Python 3. Run these commands from the repository directory:
 
 ```bash
-omarchy plugin validate ~/.config/omarchy/plugins/hotwheels.notification-controls
+plugin="$HOME/.config/omarchy/plugins/hotwheels.notification-controls"
+mkdir -p "$plugin"
+cp manifest.json NotificationService.qml NotificationLogic.js Panel.qml Bell.qml catalog.py "$plugin/"
+cp -r components "$plugin/"
+omarchy plugin validate "$plugin"
 omarchy shell shell rescanPlugins
 omarchy bar put hotwheels.notification-controls --before omarchy.tray
-omarchy shell notifications status
-omarchy shell shell summon hotwheels.notification-controls
+omarchy restart shell
 ```
 
-Python 3 provides desktop-file discovery and URL/IDNA normalization. IPC uses the supported Quickshell `IpcHandler`, which works with both older shell clients and the newer socket client's fallback.
+The plugin's replacement metadata disables the built-in notification service when enabled. Restart the shell while the desktop is unlocked.
 
-When upgrading from the earlier service-only version, disable it once before `bar put` so Omarchy moves its configuration from `plugins[]` into the bar layout.
+For a **Setup → Notifications** menu entry, merge the entry in `menu.json` into `~/.config/omarchy/extensions/omarchy-menu.jsonc`, preserving any existing entries.
 
-Verify changes directly in the running UI. This repository intentionally has no automated test suite.
-
-The shell can retain a `keepLoaded` service and cached QML across plugin rescans. After editing runtime files, restart the shell while unlocked; an IPC rescan alone is not proof that the edited code is active. Always target the intended `WAYLAND_DISPLAY` when multiple compositors are running.
-
-To return to the built-in service while retaining the plugin and its preferences:
+To return to the built-in notification service:
 
 ```bash
 omarchy plugin disable hotwheels.notification-controls
 ```
 
-## Maintenance
+## Storage and development
 
-The notification service and card originate from Omarchy, incorporating upstream through `8b4eae66` and the controls from PR #7545. This plugin carries that implementation rather than intercepting another daemon. Future upstream fixes to notification delivery and rendering need to be incorporated here. Shared `qs.Commons` and `qs.Ui` components come from the installed shell.
+Preferences and saved application identities live in `~/.local/state/omarchy/notification-controls.json`. Notification history and popup storage use Omarchy's existing notification directories. Removing an app from the launcher removes its settings row; saved rules remain effective internally.
 
-Licensed under MIT; see `LICENSE`.
+After changing installed plugin code, restart the shell to clear cached QML. Verify changes directly in the running UI; this repository has no automated test suite.
+
+The plugin carries a copy of Omarchy's notification daemon and card implementation. Upstream fixes to those components need to be incorporated here. Shared UI components come from the installed Omarchy shell.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
