@@ -25,7 +25,6 @@ BarWidget {
     bar: root.bar
     text: root.dnd ? "󰂛" : "󰂚"
     active: root.dnd
-    tooltipText: "Notifications" + (root.dnd ? " — Do not disturb" : "") + "\nRight-click to toggle Do not disturb"
     activeFocusOnTab: true
 
     Accessible.role: Accessible.Button
