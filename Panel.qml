@@ -98,7 +98,9 @@ Item {
   }
 
   function applicationSubtitle(application) {
-    if (!application || !application.source) return ""
+    if (!application) return ""
+    if (application.mode === "mixed") return "Different saved settings — choose one for this app"
+    if (!application.source) return Number(application.memberCount || 0) > 1 ? "Includes related services and helpers" : ""
     var shared = Number(application.memberCount || 0) > 1 ? " (shared origin)" : ""
     return String(application.source) + shared
   }
@@ -181,7 +183,7 @@ Item {
                 text: !root.settingsLoaded
                   ? "Loading notification settings..."
                   : (root.settingsWritable
-                    ? "Choose how each notification source reaches you"
+                    ? "Choose how each application notifies you"
                     : "Settings were created by a newer Omarchy version")
                 color: root.dimForeground
                 font.family: Style.font.menuFamily
@@ -258,7 +260,7 @@ Item {
                 id: searchField
                 Layout.fillWidth: true
                 text: root.searchText
-                placeholderText: "Search notification sources"
+                placeholderText: "Search applications"
                 foreground: root.foreground
                 onTextChanged: root.searchText = text
               }

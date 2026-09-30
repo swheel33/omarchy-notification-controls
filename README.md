@@ -4,7 +4,7 @@ A replacement for Omarchy's built-in notifications plugin, providing Normal, His
 
 ## Status
 
-Working local plugin, verified in isolated graphical sessions against the installed Omarchy 4.0.4-1 and pristine upstream `quattro` at `8b4eae66`. Checks cover first-run loading, keyboard selection in the panel, Normal / History only / Off, DND, restart persistence, and browser-origin policy overrides. Panel and toast screenshots have been inspected. The plugin is enabled on this machine's regular desktop as well.
+Working local plugin, enabled on this machine's regular desktop. The grouped application list has been inspected in the running UI on Omarchy 4.0.4-1. The original replacement daemon was also verified against pristine upstream `quattro` at `8b4eae66`.
 
 ## Open settings
 
@@ -20,15 +20,16 @@ The bell before the system tray opens settings on left-click and toggles Do Not 
 
 ## Source identity
 
-- Native notifications use their `desktop-entry` identity, whether or not the application appears in the launcher.
-- Senders without a desktop entry appear as separate **reported name** sources after their first notification. These are deliberately not guessed from potentially ambiguous launcher names.
+- Related native launchers and helpers share one application row and delivery setting. The catalog uses executable ownership, shared application names, and companion-package metadata; unrelated applications bundled in one package stay separate when their names differ.
+- Native notifications resolve through their desktop ID. Senders without a desktop entry join an application only when their name uniquely matches its metadata. Unrecognized or ambiguous senders remain separate **reported name** sources.
 - Browser website notifications use their origin. Newly observed origins inherit the sending browser's policy until explicitly configured; choosing Normal explicitly overrides a blocked browser.
 - Installed web apps are discovered from desktop files. Standard Omarchy launchers, stock HEY and Zoom handlers, Chromium `--app` launchers, and explicit `OMARCHY_WEBAPP_ORIGIN` metadata are supported. No webapp installer changes are needed. Other custom handlers are still configurable when their website first sends a notification.
 - Source names and policies remain available after hiding or removing a launcher. The catalog enriches the settings UI; delivery never waits for it.
-- The initial catalog omits desktop entries marked `NoDisplay=true` or `Hidden=true`. This filters out private helper launchers without guessing from names or shared icons. Observed senders and saved policies remain manageable even if their launcher is hidden. Separate visible desktop entries remain separate native sources; this is not application-family deduplication.
+- Hidden helper launchers contribute identities to their application without adding separate initial rows. Hidden-only sources appear when observed or configured. Entries marked `Hidden=true` mask installed launchers.
+- Existing conflicting delivery preferences remain effective and show as different saved settings. Choosing a delivery mode replaces those preferences with one application-wide setting.
 - History-only delivery follows Omarchy's existing transient-notification behavior: ephemeral notifications are discarded rather than archived.
 
-The plugin stores DND, modes, and observed source identities in `~/.local/state/omarchy/notification-controls.json`. It imports existing `notifications.json` preferences on first use. Notification bodies are not stored in this settings file; popup/history storage uses Omarchy's existing directories.
+The plugin stores DND, modes, observed source identities, and application grouping metadata in `~/.local/state/omarchy/notification-controls.json`. Saved identities load before routing starts, so policies also cover helpers before the desktop scan completes and after launcher removal. It imports existing `notifications.json` preferences on first use. Notification bodies are not stored in this settings file; popup/history storage uses Omarchy's existing directories.
 
 ## Development and installation
 
@@ -42,11 +43,11 @@ omarchy shell notifications status
 omarchy shell shell summon hotwheels.notification-controls
 ```
 
-Run offline tests with `bash ./test`. Python 3 provides desktop-file discovery and URL/IDNA normalization; Node is needed only for tests. IPC uses the supported Quickshell `IpcHandler`, which works with both older shell clients and the newer socket client's fallback.
+Python 3 provides desktop-file discovery and URL/IDNA normalization. IPC uses the supported Quickshell `IpcHandler`, which works with both older shell clients and the newer socket client's fallback.
 
 When upgrading from the earlier service-only version, disable it once before `bar put` so Omarchy moves its configuration from `plugins[]` into the bar layout.
 
-Run `bash tests/runtime.sh` for graphical verification in a disposable nested Hyprland with a private D-Bus session and temporary HOME. It does not unlock the real desktop or run another notification daemon on the real session bus. It requires Hyprland, Quickshell, `grim`, `wtype`, a C compiler, `pkg-config`, and Wayland development tools. A small virtual-pointer fixture exercises real left/right clicks on the bell. The test saves screenshots and logs under `/tmp/opencode/notification-plugin-test.*` and cleans up its own processes. Set `OMARCHY_TEST_PATH` to a pristine Omarchy checkout to test a different host version.
+Verify changes directly in the running UI. This repository intentionally has no automated test suite.
 
 The shell can retain a `keepLoaded` service and cached QML across plugin rescans. After editing runtime files, restart the shell while unlocked; an IPC rescan alone is not proof that the edited code is active. Always target the intended `WAYLAND_DISPLAY` when multiple compositors are running.
 

@@ -49,8 +49,21 @@ function sourceMode(modes, key, fallbackKey) {
 
 function sourceList(catalog, observed, modes) {
   var sources = {}
+  var covered = {}
+  for (var i = 0; i < catalog.length; i++) {
+    var members = catalog[i].memberKeys || [catalog[i].key]
+    for (var j = 0; j < members.length; j++) covered[members[j]] = catalog[i].key
+  }
   for (var key in observed) sources[key] = observed[key]
-  for (var i = 0; i < catalog.length; i++) sources[catalog[i].key] = catalog[i]
+  for (var i = 0; i < catalog.length; i++) {
+    var app = catalog[i]
+    var relevant = app.visible !== false || modes[app.key] !== undefined || observed[app.key]
+    for (var j = 0; j < app.memberKeys.length; j++) {
+      var member = app.memberKeys[j]
+      if (modes[member] !== undefined || observed[member]) relevant = true
+    }
+    if (relevant) sources[app.key] = Object.assign({}, observed[app.key] || {}, app)
+  }
   for (var key in modes) {
     if (sources[key]) continue
     var label = key.slice(key.indexOf(":") + 1)
@@ -58,7 +71,9 @@ function sourceList(catalog, observed, modes) {
     sources[key] = { key: key, label: label, app: label, appIcon: "",
       desktopEntry: "", source: "", memberCount: 1, searchText: label }
   }
-  return Object.keys(sources).map(function(key) { return sources[key] }).sort(function(a, b) {
+  return Object.keys(sources).filter(function(key) {
+    return !covered[key] || covered[key] === key
+  }).map(function(key) { return sources[key] }).sort(function(a, b) {
     return a.label.toLowerCase().localeCompare(b.label.toLowerCase())
   })
 }
@@ -73,6 +88,74 @@ function normalizedSources(value) {
     if (source.key === key) sources[key] = source
   }
   return sources
+}
+
+// Saved identities are hydrated with policies before notification routing starts.
+// Keep missing launchers as hidden metadata so removing one cannot lose a rule.
+function mergeApplicationCatalog(current, previous, aliases) {
+  var merged = {}
+  var claimed = {}
+  for (var i = 0; i < current.length; i++) {
+    var app = current[i]
+    merged[app.key] = Object.assign({}, app, { memberKeys: app.memberKeys.slice() })
+    for (var j = 0; j < app.memberKeys.length; j++) claimed[app.memberKeys[j]] = app.key
+  }
+  for (var i = 0; i < previous.length; i++) {
+    var old = previous[i]
+    var members = old.memberKeys.filter(function(key) {
+      if (claimed[key]) return false
+      if (aliases && key.indexOf("name:") === 0) {
+        var name
+        try { name = decodeURIComponent(key.slice(5)) } catch (e) { return false }
+        if (aliases[aliasKey(name)] === "") return false
+      }
+      return true
+    })
+    if (merged[old.key]) merged[old.key].memberKeys = merged[old.key].memberKeys.concat(members)
+    else if (members.length) merged[old.key] = Object.assign({}, old, { visible: false, memberKeys: members })
+  }
+  return Object.keys(merged).map(function(key) { return merged[key] })
+}
+
+function applicationIndex(catalog) {
+  var keys = {}
+  for (var i = 0; i < catalog.length; i++) {
+    var app = catalog[i]
+    keys[app.key] = app
+    for (var j = 0; j < app.memberKeys.length; j++) keys[app.memberKeys[j]] = app
+  }
+  return keys
+}
+
+function normalizedCatalog(value) {
+  if (!Array.isArray(value)) return []
+  return value.filter(function(app) {
+    return app && typeof app.key === "string" && typeof app.label === "string" &&
+      Array.isArray(app.memberKeys) && app.memberKeys.every(function(key) { return typeof key === "string" })
+  })
+}
+
+function groupedMode(modes, keys, key, fallbackKey) {
+  var app = keys[key]
+  if (app && modes[app.key] !== undefined) return validApplicationMode(modes[app.key])
+  if (modes[key] !== undefined) return validApplicationMode(modes[key])
+  if (fallbackKey) return groupedMode(modes, keys, fallbackKey, "")
+  return "normal"
+}
+
+function applicationDisplayMode(modes, keys, app) {
+  if (modes[app.key] !== undefined) return validApplicationMode(modes[app.key])
+  if (app.source) return groupedMode(modes, keys, app.key, app.fallbackKey)
+  var members = app.memberKeys || [app.key]
+  var selected = null
+  for (var i = 0; i < members.length; i++) {
+    // Unconfigured sender aliases are not separate legacy preferences.
+    if (members[i].indexOf("name:") === 0 && modes[members[i]] === undefined) continue
+    var mode = groupedMode(modes, keys, members[i], app.fallbackKey)
+    if (selected !== null && selected !== mode) return "mixed"
+    selected = mode
+  }
+  return selected || groupedMode(modes, keys, app.key, app.fallbackKey)
 }
 
 function normalizedOrigin(value) {
@@ -192,27 +275,36 @@ function buildApplicationCatalog(entries) {
         label: label,
         appIcon: String(entry.appIcon || ""),
         desktopEntry: desktopEntry,
-        startupClass: String(entry.startupClass || "")
+        startupClass: String(entry.startupClass || ""),
+        visible: entry.visible !== false
       })
       origins[origin] = groupKey
     } else {
-      source = {
-        key: desktopKey,
-        origin: "",
-        members: [{
+      var nativeKey = entry.applicationId ? identityKey("app", entry.applicationId) : desktopKey
+      source = groups[nativeKey]
+      if (!source) {
+        source = { key: nativeKey, origin: "", members: [] }
+        groups[nativeKey] = source
+        slots.push(source)
+      }
+      source.members.push({
           label: label,
           appIcon: String(entry.appIcon || ""),
           desktopEntry: desktopEntry,
-          startupClass: String(entry.startupClass || "")
-        }]
-      }
-      slots.push(source)
+          startupClass: String(entry.startupClass || ""),
+          name: String(entry.name || label),
+          executable: String(entry.executable || ""),
+          visible: entry.visible !== false
+      })
     }
   }
 
   var applications = []
   for (var s = 0; s < slots.length; s++) {
     var slot = slots[s]
+    slot.members.sort(function(a, b) {
+      return Number(b.visible !== false) - Number(a.visible !== false) || a.label.length - b.label.length || a.desktopEntry.localeCompare(b.desktopEntry)
+    })
     var first = slot.members[0]
     var labels = []
     var search = [slot.origin]
@@ -223,21 +315,41 @@ function buildApplicationCatalog(entries) {
       claimAlias(aliases, member.desktopEntry, slot.key)
       claimAlias(aliases, member.label, slot.key)
       claimAlias(aliases, member.startupClass, slot.key)
+      if (!slot.origin) {
+        claimAlias(aliases, member.name, slot.key)
+        claimAlias(aliases, member.executable, slot.key)
+      }
     }
     var application = {
       key: slot.key,
-      label: labels.join(" + "),
+      label: slot.origin ? labels.join(" + ") : first.label,
       app: first.label,
       appIcon: first.appIcon,
       desktopEntry: first.desktopEntry,
       source: slot.origin,
       searchText: search.join(" "),
-      memberCount: slot.members.length
+      memberCount: slot.members.length,
+      visible: slot.members.some(function(member) { return member.visible !== false }),
+      memberKeys: slot.members.map(function(member) { return applicationKey(member.desktopEntry) })
+    }
+    if (!slot.origin && slot.members.length > 1) {
+      var words = first.label.split(/\s+/)
+      for (var m = 1; m < slot.members.length; m++) {
+        var other = slot.members[m].label.split(/\s+/)
+        var n = 0
+        while (n < words.length && n < other.length && words[n].toLowerCase() === other[n].toLowerCase()) n++
+        words = words.slice(0, n)
+      }
+      if (words.length) application.label = words.join(" ")
     }
     applications.push(application)
     keys[slot.key] = application
   }
 
+  for (var alias in aliases) {
+    var target = keys[aliases[alias]]
+    if (target && !target.source) target.memberKeys.push(identityKey("name", alias.slice(6)))
+  }
   return { applications: applications, keys: keys, aliases: aliases, origins: origins }
 }
 
@@ -559,6 +671,7 @@ function parseSettings(raw) {
       dnd: parsed && typeof parsed.dnd === "boolean" ? parsed.dnd : null,
       modes: normalizedApplicationModes(parsed && parsed.modes),
       sources: normalizedSources(parsed && parsed.sources),
+      catalog: normalizedCatalog(parsed && parsed.catalog),
       legacy: !!(parsed && !future && (parsed.version !== 4 || parsed.pending || parsed.past || parsed.entries)),
       future: future
     }
@@ -743,6 +856,10 @@ function historyRows(raw, liveRows, normalUrgency, limit) {
 
 if (typeof module !== "undefined") {
   module.exports = {
+    mergeApplicationCatalog: mergeApplicationCatalog,
+    applicationIndex: applicationIndex,
+    groupedMode: groupedMode,
+    applicationDisplayMode: applicationDisplayMode,
     isChromiumDerived: isChromiumDerived,
     normalizedIdentity: normalizedIdentity,
     applicationKey: applicationKey,

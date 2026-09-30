@@ -106,7 +106,7 @@ Item {
         source: application.source,
         searchText: application.searchText,
         memberCount: application.memberCount,
-        mode: service.applicationMode(application.key)
+        mode: NotificationLogic.applicationDisplayMode(applicationModes, applicationKeys, application)
       })
     }
     return sources
@@ -120,15 +120,16 @@ Item {
     var entries
     try { entries = JSON.parse(raw) } catch (e) { return }
     var catalog = NotificationLogic.buildApplicationCatalog(entries)
-    applicationCatalog = catalog.applications
-    applicationKeys = catalog.keys
+    applicationCatalog = NotificationLogic.mergeApplicationCatalog(catalog.applications, applicationCatalog, catalog.aliases)
+    applicationKeys = NotificationLogic.applicationIndex(applicationCatalog)
     catalogLoaded = true
+    scheduleSettingsSave()
   }
 
   function applicationMode(key) {
     var id = String(key || "")
     var source = observedSources[id]
-    return NotificationLogic.sourceMode(applicationModes, id, source ? source.fallbackKey : "")
+    return NotificationLogic.groupedMode(applicationModes, applicationKeys, id, source ? source.fallbackKey : "")
   }
 
   function applicationForKey(key) {
@@ -179,10 +180,12 @@ Item {
     var id = String(key || "")
     var requested = String(mode || "").toLowerCase()
     if (!applicationForKey(id) || (requested !== "normal" && requested !== "history" && requested !== "off")) return false
-    if (applicationModes[id] === requested) return true
+    var application = applicationKeys[id]
+    if (application) id = application.key
+    var members = application ? application.memberKeys : []
     var modes = {}
     for (var applicationKey in applicationModes)
-      if (applicationKey !== id) modes[applicationKey] = applicationModes[applicationKey]
+      if (applicationKey !== id && members.indexOf(applicationKey) === -1) modes[applicationKey] = applicationModes[applicationKey]
     modes[id] = requested
     applicationModes = modes
     scheduleSettingsSave()
@@ -1009,6 +1012,8 @@ Item {
 
     service.applicationModes = parsed.modes || {}
     service.observedSources = parsed.sources || {}
+    service.applicationCatalog = NotificationLogic.mergeApplicationCatalog(service.applicationCatalog, parsed.catalog || [])
+    service.applicationKeys = NotificationLogic.applicationIndex(service.applicationCatalog)
 
     service.settingsWritable = !parsed.future
     service.settingsLoaded = true
@@ -1025,7 +1030,8 @@ Item {
       version: 4,
       dnd: persisted.doNotDisturb,
       modes: service.applicationModes,
-      sources: service.observedSources
+      sources: service.observedSources,
+      catalog: service.applicationCatalog
     }, null, 2) + "\n")
   }
 
