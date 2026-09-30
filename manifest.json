@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "hotwheels.notifications",
+  "name": "Notification Controls",
+  "version": "1.0.0",
+  "author": "Omarchy",
+  "description": "Notification daemon with per-source delivery controls",
+  "kinds": [
+    "service",
+    "panel"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml",
+    "panel": "Panel.qml"
+  },
+  "omarchy": {
+    "clonedFrom": "omarchy.notifications"
+  }
+}

@@ -1,0 +1,6 @@
+#!/bin/bash
+set -euo pipefail
+root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+node "$root/tests/logic.cjs"
+PYTHONDONTWRITEBYTECODE=1 python3 "$root/tests/catalog_test.py"
+omarchy plugin validate "$root"
