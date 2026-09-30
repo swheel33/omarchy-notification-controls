@@ -72,26 +72,6 @@ def executable(command):
   return (str(Path(path).resolve()) if path else parts[0]), name
 
 
-def package_owners(paths, database=Path("/var/lib/pacman/local")):
-  """Read ownership in one pass instead of spawning pacman for every launcher."""
-  wanted = {path.lstrip("/") for path in paths if path.startswith("/")}
-  owners = {}
-  if not wanted:
-    return owners
-  for package in database.glob("*/files"):
-    try:
-      matched = wanted.intersection(package.read_text().splitlines())
-      if not matched:
-        continue
-      description = (package.parent / "desc").read_text().splitlines()
-      name = description[description.index("%NAME%") + 1]
-      for path in matched:
-        owners["/" + path] = name
-    except (OSError, ValueError, IndexError):
-      continue
-  return owners
-
-
 def applications():
   home = Path.home()
   omarchy = Path(os.environ["OMARCHY_PATH"])
@@ -131,29 +111,9 @@ def applications():
           "visible": desktop_id not in hidden and entry.get("NoDisplay", "").lower() != "true"})
       except (OSError, UnicodeError, configparser.Error, KeyError, ValueError):
         continue
-  commands = {entry["id"]: executable(entry["command"]) for entry in entries if not command_origin(entry["command"])}
-  owners = package_owners([path for path, name in commands.values()])
-  families = {}
   for entry in entries:
-    path, name = commands.get(entry["id"], ("", ""))
-    owner = owners.get(path, "")
-    if owner and entry["visible"]:
-      families.setdefault(owner, set()).add(entry["name"].split()[0].casefold())
-  for entry in entries:
-    path, name = commands.get(entry["id"], ("", ""))
-    owner = owners.get(path, "")
-    if owner and not entry["visible"] and owner not in families:
-      # Companion packages such as fcitx5-qt6 can contain only helpers.
-      parents = [package for package, names in families.items()
-        if owner.startswith(package + "-") and names == {entry["name"].split()[0].casefold()}]
-      if len(parents) == 1:
-        owner = parents[0]
-    # Omarchy ships unrelated app launchers; that shared package isn't an app.
-    # A package can ship unrelated applications (for example Qt tools).
-    # Use it as a family only when its visible launchers agree on a name.
-    if owner.startswith("omarchy") or len(families.get(owner, set())) != 1:
-      owner = ""
-    entry["applicationId"] = ("package:" + owner if owner else "executable:" + path) if path else ""
+    path, name = executable(entry["command"]) if not command_origin(entry["command"]) else ("", "")
+    entry["executablePath"] = path
     entry["executable"] = name
   return entries
 

@@ -20,12 +20,13 @@ The bell before the system tray opens settings on left-click and toggles Do Not 
 
 ## Application list
 
-- Related native launchers and helpers share one application row and delivery setting. The catalog uses executable ownership, shared application names, and companion-package metadata; unrelated applications bundled in one package stay separate when their names differ.
+- Each visible native launcher has its own row and delivery setting. A hidden helper joins an app only when its executable or window-class metadata identifies one unambiguous visible parent. Package ownership and name prefixes are not used to group apps.
 - Only applications visible in Omarchy's launcher appear in settings, using a visible launcher's name and icon. The list uses Quickshell's application entries and Omarchy's own launcher exclusion rules. Incoming notifications never create rows.
 - Native notifications resolve through their desktop ID. Senders without a desktop entry join an application only when their name uniquely matches its metadata. Unmatched senders follow normal notification behavior and DND.
 - Installed web apps have their own settings, matched by website origin. Ordinary website notifications use their browser's setting. Standard Omarchy launchers, stock HEY and Zoom handlers, Chromium `--app` launchers, and explicit `OMARCHY_WEBAPP_ORIGIN` metadata are supported.
 - Hidden helpers contribute identities to their parent app, without separate rows or helper descriptions. Hiding or removing an app removes it from the list; existing saved rules remain effective internally.
 - Existing conflicting delivery preferences remain effective and show as different saved settings. Choosing a delivery mode replaces those preferences with one application-wide setting.
+- When upgrading from package-family grouping, a saved family preference is copied to its individual launcher apps unless they already have an explicit setting. Web launchers sharing a website origin still share that site's setting.
 - History-only delivery follows Omarchy's existing transient-notification behavior: ephemeral notifications are discarded rather than archived.
 
 The plugin stores DND, modes, and application grouping metadata in `~/.local/state/omarchy/notification-controls.json`. Saved identities load before routing starts, so policies also cover helpers before the desktop scan completes and after launcher removal. It imports existing `notifications.json` preferences on first use. Notification bodies are not stored in this settings file; popup/history storage uses Omarchy's existing directories.

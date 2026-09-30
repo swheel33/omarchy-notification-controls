@@ -189,6 +189,21 @@ function buildApplicationCatalog(entries) {
   var keys = {}
   var aliases = {}
   var origins = {}
+  var parents = {}
+  // Only visible native launchers can own helpers. Shared executables/classes
+  // are ambiguous, so suites such as LibreOffice never collapse into one row.
+  for (var i = 0; i < input.length; i++) {
+    var entry = input[i]
+    if (!entry || !entry.visible || webAppOrigin(entry.command)) continue
+    var key = applicationKey(entry.id)
+    var hints = [entry.executablePath ? "exec:" + entry.executablePath : "",
+      entry.startupClass ? "class:" + entry.startupClass : ""]
+    for (var h = 0; h < hints.length; h++) {
+      if (!hints[h]) continue
+      if (parents[hints[h]] === undefined) parents[hints[h]] = key
+      else if (parents[hints[h]] !== key) parents[hints[h]] = ""
+    }
+  }
 
   for (var i = 0; i < input.length; i++) {
     var entry = input[i] || {}
@@ -216,7 +231,17 @@ function buildApplicationCatalog(entries) {
       })
       origins[origin] = groupKey
     } else {
-      var nativeKey = entry.applicationId ? identityKey("app", entry.applicationId) : desktopKey
+      var nativeKey = desktopKey
+      if (!entry.visible) {
+        var candidates = []
+        var hints = [entry.executablePath ? "exec:" + entry.executablePath : "",
+          entry.startupClass ? "class:" + entry.startupClass : ""]
+        for (var h = 0; h < hints.length; h++) {
+          var parent = parents[hints[h]]
+          if (parent && candidates.indexOf(parent) === -1) candidates.push(parent)
+        }
+        if (candidates.length === 1) nativeKey = candidates[0]
+      }
       source = groups[nativeKey]
       if (!source) {
         source = { key: nativeKey, origin: "", members: [] }
