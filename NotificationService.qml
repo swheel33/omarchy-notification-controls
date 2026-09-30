@@ -988,6 +988,7 @@ Item {
   }
 
   property bool settingsLoaded: false
+  property bool settingsInvalid: false
   property bool settingsWritable: true
 
   function loadSettings(raw) {
@@ -1009,7 +1010,9 @@ Item {
     service.applicationCatalog = NotificationLogic.mergeApplicationCatalog(service.applicationCatalog, parsed.catalog || [])
     service.applicationKeys = NotificationLogic.applicationIndex(service.applicationCatalog)
 
-    service.settingsWritable = !parsed.future
+    service.settingsInvalid = parsed.error
+    // Preserve unreadable preferences instead of replacing them on catalog refresh.
+    service.settingsWritable = !parsed.error && !parsed.future
     service.settingsLoaded = true
     // Versions before the history moved into its own directory kept every
     // notification in here. Rewrite once so that dead payload doesn't sit in

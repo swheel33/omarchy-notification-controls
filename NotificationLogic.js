@@ -558,6 +558,8 @@ var DUPLICATE_ROLES = ["app", "summary", "body", "image", "execArgv"]
 
 function isDuplicatePopup(row, snapshot) {
   if (!row || !snapshot || row.originalId === snapshot.originalId) return false
+  // Display names are not unique; only collapse messages from the same source.
+  if (sourceKeyFor(row) !== sourceKeyFor(snapshot)) return false
   for (var i = 0; i < DUPLICATE_ROLES.length; i++) {
     var role = DUPLICATE_ROLES[i]
     if ((row[role] || "") !== (snapshot[role] || "")) return false

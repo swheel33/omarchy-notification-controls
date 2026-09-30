@@ -183,7 +183,9 @@ Item {
                   ? "Loading notification settings..."
                   : (root.settingsWritable
                     ? "Choose how each application notifies you"
-                    : "Settings were created by a newer Omarchy version")
+                    : (root.service.settingsInvalid
+                      ? "Settings file is invalid; saved preferences were preserved"
+                      : "Settings were created by a newer Omarchy version"))
                 color: root.dimForeground
                 font.family: Style.font.menuFamily
                 font.pixelSize: Style.font.bodySmall
