@@ -6,14 +6,17 @@ fi
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 work=$(mktemp -d /tmp/opencode/notification-plugin-test.XXXXXX)
 printf 'Test artifacts: %s\n' "$work"
+wayland-scanner client-header "$root/tests/fixtures/virtual-pointer.xml" "$work/notification-virtual-pointer.h"
+wayland-scanner private-code "$root/tests/fixtures/virtual-pointer.xml" "$work/notification-virtual-pointer.c"
+cc -I"$work" "$root/tests/fixtures/click.c" "$work/notification-virtual-pointer.c" $(pkg-config --cflags --libs wayland-client) -o "$work/click"
 plugin_id=$(jq -r .id "$root/manifest.json")
 plugin_dir="$work/home/.config/omarchy/plugins/$plugin_id"
 mkdir -p "$plugin_dir" "$work/home/.local/state/omarchy"
-cp "$root/"{NotificationService.qml,Panel.qml,NotificationLogic.js,manifest.json,catalog.py} "$plugin_dir/"
+cp "$root/"{NotificationService.qml,Panel.qml,Bell.qml,NotificationLogic.js,manifest.json,catalog.py} "$plugin_dir/"
 cp -a "$root/components" "$plugin_dir/"
 export OMARCHY_PATH=${OMARCHY_TEST_PATH:-$OMARCHY_PATH}
 export PATH="$OMARCHY_PATH/bin:$PATH"
-omarchy-plugin-catalog | jq --arg id "$plugin_id" '{version:1, plugins:[{id:$id}], disabledPlugins:[.[] | select(.firstParty and .id != "omarchy.bar" and .id != "omarchy.menu") | .id],bar:{layout:{left:[],center:[],right:[]}}}' > "$work/home/.config/omarchy/shell.json"
+omarchy-plugin-catalog | jq --arg id "$plugin_id" '{version:1, plugins:[], disabledPlugins:[.[] | select(.firstParty and .id != "omarchy.bar" and .id != "omarchy.menu") | .id],bar:{layout:{left:[],center:[],right:[{id:$id}]}}}' > "$work/home/.config/omarchy/shell.json"
 mkdir -p "$work/home/.config/omarchy/extensions"
 cp "$root/menu.json" "$work/home/.config/omarchy/extensions/omarchy-menu.jsonc"
 cat > "$work/hyprland.lua" <<'LUA'
@@ -62,6 +65,22 @@ start_shell
 hyprctl eval 'hl.monitor({output="WAYLAND-1",disabled=true})'
 hyprctl dismissnotify -1
 omarchy-shell notifications status
+omarchy-shell shell debugBarGeometry > "$work/bar-geometry.json"
+read -r bell_x bell_y < <(jq -r --arg id "$plugin_id" '.[] | select(.id == $id and .visible and .itemVisible) | "\(.x + .width / 2 | floor) \(.y + .height / 2 | floor)"' "$work/bar-geometry.json" | head -1)
+[[ -n $bell_x && -n $bell_y ]]
+click_bell() {
+  "$work/click" "$bell_x" "$bell_y" "$1"
+  sleep 0.25
+}
+click_bell 273
+[[ $(omarchy-shell notifications dndState) == "on" ]]
+hyprctl dispatch 'hl.dsp.cursor.move({x=640,y=400})'
+grim -o NOTIFICATION-TEST "$work/bell-dnd.png"
+sleep 0.6
+click_bell 273
+[[ $(omarchy-shell notifications dndState) == "off" ]]
+hyprctl dispatch 'hl.dsp.cursor.move({x=640,y=400})'
+grim -o NOTIFICATION-TEST "$work/bell-normal.png"
 omarchy-notification-send --app-name 'Plugin Test' -u normal 'Plugin normal delivery' 'This popup is delivered by the replacement plugin.'
 for attempt in {1..50}; do
   if omarchy-shell notifications status | jq -e '.popups == 1' >/dev/null; then break; fi
@@ -71,8 +90,10 @@ omarchy-shell notifications status | jq -e '.popups == 1 and .pending == 0'
 sleep 0.5
 grim -o NOTIFICATION-TEST "$work/normal.png"
 omarchy-shell notifications dismiss 'Plugin normal delivery'
-omarchy-shell shell summon "$plugin_id"
+click_bell 272
+hyprctl -j layers | jq -e '.. | objects | select(.namespace? == "omarchy-notification-controls")' > "$work/panel-layer.json"
 sleep 0.5
+grim -o NOTIFICATION-TEST "$work/panel-all-sources.png"
 wtype 'Plugin Test'
 sleep 0.5
 grim -o NOTIFICATION-TEST "$work/panel-normal.png"

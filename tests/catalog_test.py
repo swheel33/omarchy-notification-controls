@@ -37,7 +37,7 @@ class CatalogTest(unittest.TestCase):
       (user / "applications" / "web.desktop").write_text('[Desktop Entry]\nType=Application\nName=Books\nExec=omarchy-launch-webapp "https://bücher.example/path"\n')
       with patch.dict(os.environ, {"XDG_DATA_HOME": str(user), "XDG_DATA_DIRS": str(system)}):
         entries = {entry["id"]: entry for entry in catalog.applications()}
-      self.assertIn("background", entries)
+      self.assertNotIn("background", entries)
       self.assertNotIn("masked", entries)
       self.assertIn("OMARCHY_WEBAPP_ORIGIN=https://xn--bcher-kva.example", entries["web"]["command"])
 

@@ -2,17 +2,26 @@
   "schemaVersion": 1,
   "id": "hotwheels.notification-controls",
   "name": "Notification Controls",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "Omarchy",
   "description": "Notification daemon with per-source delivery controls",
   "kinds": [
     "service",
-    "panel"
+    "panel",
+    "bar-widget"
   ],
   "keepLoaded": true,
   "entryPoints": {
     "service": "NotificationService.qml",
-    "panel": "Panel.qml"
+    "panel": "Panel.qml",
+    "barWidget": "Bell.qml"
+  },
+  "barWidget": {
+    "displayName": "Notifications",
+    "description": "Notification settings and Do Not Disturb",
+    "category": "System",
+    "defaultSection": "right",
+    "allowMultiple": false
   },
   "omarchy": {
     "clonedFrom": "omarchy.notifications"

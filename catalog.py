@@ -64,7 +64,11 @@ def applications():
       try:
         config.read(path, encoding="utf-8")
         entry = config["Desktop Entry"]
-        if entry.get("Type") != "Application" or entry.get("Hidden", "").lower() == "true":
+        # The initial list should contain launchable apps, not their private
+        # URL handlers, authentication dialogs, or input-method wrappers.
+        # Observed sources and saved policies are merged separately by the
+        # service, so this presentation filter never disables a policy.
+        if entry.get("Type") != "Application" or any(entry.get(flag, "").lower() == "true" for flag in ("Hidden", "NoDisplay")):
           continue
         command = shlex.split(entry.get("Exec", ""))
         web_origin = command_origin(command)

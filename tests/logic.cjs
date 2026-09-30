@@ -18,6 +18,8 @@ assert.equal(logic.sourceList(catalog, {}, modes).length, 1)
 const orphan = logic.sourceList([], {}, modes)
 assert.equal(orphan[0].key, nativeKey)
 assert.equal(logic.sourceMode(modes, orphan[0].key), 'off')
+const hiddenSource = logic.observedSource({ app: 'Background helper', desktopEntry: 'helper' })
+assert.equal(logic.sourceList([], { [hiddenSource.key]: hiddenSource }, {})[0].key, 'desktop:helper')
 
 // A sender without a desktop entry remains an independently controllable
 // source; a launcher-name collision must not misattribute it to another app.
