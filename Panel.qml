@@ -22,6 +22,12 @@ Item {
   readonly property bool catalogLoaded: !!root.service && root.service.catalogLoaded === true
   readonly property bool settingsWritable: root.settingsLoaded && root.service.settingsWritable !== false
 
+  PersistentProperties {
+    id: viewOptions
+    reloadableId: "hotwheels-notification-controls-view"
+    property bool groupByMode: false
+  }
+
   readonly property color background: Color.menu.background
   readonly property color foreground: Color.menu.text
   readonly property color dimForeground: Util.alpha(foreground, 0.58)
@@ -32,15 +38,18 @@ Item {
   readonly property var applications: service && typeof service.applicationsList === "function" ? service.applicationsList() : []
   readonly property var filteredApplications: {
     var query = searchText.trim().toLowerCase()
-    if (!query) return applications
-
     var matches = []
     for (var i = 0; i < applications.length; i++) {
       var application = applications[i]
       var haystack = [application.label, application.app, application.desktopEntry, application.source, application.searchText].join(" ").toLowerCase()
-      if (haystack.indexOf(query) >= 0) matches.push(application)
+      if (!query || haystack.indexOf(query) >= 0) matches.push(application)
     }
-    return matches
+    var grouped = viewOptions.groupByMode
+    var modes = ["normal", "history", "off", "mixed"]
+    return matches.sort(function(a, b) {
+      if (grouped && a.mode !== b.mode) return modes.indexOf(a.mode) - modes.indexOf(b.mode)
+      return a.label.toLowerCase().localeCompare(b.label.toLowerCase()) || a.key.localeCompare(b.key)
+    })
   }
   readonly property var selectedApplication: {
     for (var i = 0; i < filteredApplications.length; i++)
@@ -54,7 +63,7 @@ Item {
     root.opened = true
     if (root.service) root.service.rebuildApplicationCatalog()
     root.searchText = ""
-    root.selectedKey = root.applications.length > 0 ? String(root.applications[0].key) : ""
+    root.ensureSelection()
     Qt.callLater(function() {
       if (root.opened) searchField.forceActiveFocus()
     })
@@ -77,8 +86,9 @@ Item {
       root.selectedKey = ""
       return
     }
-    if (!root.selectedApplication)
-      root.selectedKey = String(root.filteredApplications[0].key)
+    for (var i = 0; i < root.filteredApplications.length; i++)
+      if (String(root.filteredApplications[i].key) === root.selectedKey) return
+    root.selectedKey = String(root.filteredApplications[0].key)
   }
 
   function setMode(mode) {
@@ -104,8 +114,32 @@ Item {
     return ""
   }
 
-  onApplicationsChanged: ensureSelection()
-  onFilteredApplicationsChanged: ensureSelection()
+  function modeLabel(mode) {
+    switch (mode) {
+    case "history": return "History Only"
+    case "off": return "Off"
+    case "mixed": return "Mixed settings"
+    default: return "All"
+    }
+  }
+
+  function groupCount(mode) {
+    return filteredApplications.filter(function(application) { return application.mode === mode }).length
+  }
+
+  ListModel { id: applicationModel }
+
+  onFilteredApplicationsChanged: {
+    // Named model roles let ListView render delivery-mode section headers.
+    applicationModel.clear()
+    for (var i = 0; i < filteredApplications.length; i++)
+      applicationModel.append(filteredApplications[i])
+    ensureSelection()
+    Qt.callLater(function() {
+      if (applicationList.currentIndex >= 0)
+        applicationList.positionViewAtIndex(applicationList.currentIndex, ListView.Contain)
+    })
+  }
 
   PanelWindow {
     id: panel
@@ -266,6 +300,43 @@ Item {
                 onTextChanged: root.searchText = text
               }
 
+              CheckBox {
+                id: groupingCheckBox
+                Layout.fillWidth: true
+                text: "Group by delivery mode"
+                checked: viewOptions.groupByMode
+                onToggled: viewOptions.groupByMode = checked
+                spacing: Style.spacing.sm
+                padding: 0
+                implicitHeight: Style.spacing.controlHeight
+
+                indicator: BorderSurface {
+                  implicitWidth: Style.space(16)
+                  implicitHeight: Style.space(16)
+                  y: (groupingCheckBox.height - height) / 2
+                  color: "transparent"
+                  borderSpec: Border.controlSpec(groupingCheckBox.activeFocus ? "focus" : (groupingCheckBox.hovered ? "hover-cursor" : "normal"), root.foreground, Color.accent)
+
+                  Text {
+                    anchors.centerIn: parent
+                    text: "✓"
+                    visible: groupingCheckBox.checked
+                    color: root.foreground
+                    font.pixelSize: Style.font.body
+                  }
+                }
+
+                contentItem: Text {
+                  text: groupingCheckBox.text
+                  leftPadding: groupingCheckBox.indicator.width + groupingCheckBox.spacing
+                  color: root.foreground
+                  font.family: Style.font.menuFamily
+                  font.pixelSize: Style.font.body
+                  verticalAlignment: Text.AlignVCenter
+                  elide: Text.ElideRight
+                }
+              }
+
               ListView {
                 id: applicationList
                 Layout.fillWidth: true
@@ -273,7 +344,7 @@ Item {
                 clip: true
                 spacing: Style.spacing.xs
                 boundsBehavior: Flickable.StopAtBounds
-                model: root.filteredApplications
+                model: applicationModel
                 currentIndex: {
                   for (var i = 0; i < root.filteredApplications.length; i++)
                     if (String(root.filteredApplications[i].key) === root.selectedKey) return i
@@ -282,12 +353,31 @@ Item {
                 onCurrentIndexChanged: if (currentIndex >= 0) positionViewAtIndex(currentIndex, ListView.Contain)
                 ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
+                section.property: viewOptions.groupByMode ? "mode" : ""
+                section.criteria: ViewSection.FullString
+                section.delegate: Text {
+                  id: groupHeader
+                  required property string section
+                  width: ListView.view.width
+                  topPadding: Style.spacing.sm
+                  bottomPadding: Style.spacing.xs
+                  leftPadding: Style.spacing.sm
+                  textFormat: Text.PlainText
+                  text: root.modeLabel(groupHeader.section) + " (" + root.groupCount(groupHeader.section) + ")"
+                  color: root.dimForeground
+                  font.family: Style.font.menuFamily
+                  font.pixelSize: Style.font.caption
+                  font.bold: true
+                  elide: Text.ElideRight
+                }
+
                 delegate: CursorSurface {
                   id: applicationRow
-                  required property var modelData
+                  required property var model
+                  readonly property var modelData: model
                   required property int index
                   readonly property bool chosen: String(modelData.key) === root.selectedKey
-                  readonly property string subtitle: root.applicationSubtitle(modelData)
+                  readonly property string subtitle: root.modeLabel(modelData.mode)
 
                   width: ListView.view.width
                   implicitHeight: Math.max(Style.space(52), rowContent.implicitHeight + Style.spacing.md)
@@ -458,8 +548,8 @@ Item {
 
               Repeater {
                 model: [
-                  { value: "normal", label: "Normal", description: "Show popups and keep notifications in history." },
-                  { value: "history", label: "History only", description: "Skip popups but keep notifications in history." },
+                  { value: "normal", label: "All", description: "Show popups and keep notifications in history." },
+                  { value: "history", label: "History Only", description: "Skip popups but keep notifications in history." },
                   { value: "off", label: "Off", description: "Discard new notifications from this application." }
                 ]
 
