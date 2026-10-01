@@ -20,11 +20,7 @@ Requires Omarchy's Quickshell desktop and Python 3.
 omarchy plugin add https://github.com/swheel33/omarchy-notification-controls --enable
 ```
 
-This replaces Omarchy's built-in notification service. To position the bell before the system tray:
-
-```bash
-omarchy bar move hotwheels.notification-controls --before omarchy.tray
-```
+This replaces Omarchy's built-in notification service.
 
 ## Open notification settings
 
